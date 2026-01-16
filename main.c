@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <string.h>
 
-#define DATA_SIZE (16 * 1024 * 1024) // 16 MB
+#define DATA_SIZE (256) // 16 MB
 
 #define FIFO_WRITE "/dev/axis_fifo_0x0000000080030000"
 #define FIFO_READ  "/dev/axis_fifo_0x0000000080060000"
@@ -30,7 +30,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Initialize buffer with some data
-    memset(buffer_out, 'A', DATA_SIZE);
+    for (unsigned i=0; i<DATA_SIZE; i++) {
+        buffer_out[i] = (0xCAFEDECA ^ i) + i;
+    }
 
     printf("Opening FIFOs: %s -> %s \n", fifo_out, fifo_in);
 
@@ -62,11 +64,17 @@ int main(int argc, char *argv[]) {
     ssize_t total_read = 0;
     while (total_read < DATA_SIZE) {
         ssize_t bytes_read = read(fd_read, buffer_in + total_read, DATA_SIZE - total_read);
-        if (bytes_read <= 0) break;
+        if (bytes_read <= 0) {
+            printf("Error while reading\n");
+            goto finish;
+        }
         total_read += bytes_read;
     }
-    printf("Successfully read %zd bytes.\n", total_read);
 
+    int diff = memcmp(buffer_out, buffer_in, DATA_SIZE);
+    printf("Successfully read %zd bytes, diff = %d.\n", total_read, diff);
+
+finish:
     // Cleanup
     close(fd_write);
     close(fd_read);
